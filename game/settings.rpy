@@ -3,7 +3,6 @@ default persistent.endings_unlocked = []
 default current_llm_job = None
 default seen_labels = set()
 default routes_number = []
-default registered_characters = []
 
 init -2 python:
     def scene_register(label_name):
