@@ -2,12 +2,16 @@
 
 init python:
     class charRegister:
-        def __init__(self, char:Character(), strength=0):
+        def __init__(self, char:Character(), powr:int=0, agi:int=0, vit:int=0):
             self.char = char
-            self.strength = strength
+            self.powr = powr
+            self.agi = agi
+            self.vit = vit
         
         def __call__(self, *args, **kwargs):
             return self.char(*args, **kwargs)
+
+# TODO: decide if the class should be only for a character's stats and info, or if it should also include the character itself. Having the character in the class could be messy as to how to call it in dialogue and stuff, like it's just way better to call tm instead of tm.char.
 
 # So far this is just a template, later use a for/while with a function to create characters from a list/dictionary of name and stats.
 # That way we can even append characters middle game if we want to, and it would be easier to manage them all in one place.
