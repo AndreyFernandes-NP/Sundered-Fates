@@ -23,6 +23,7 @@ init -2 python:
 
     # Vars
     from_splash = False
+    last_visited_label = None
 
     # Other functions
     def chroma_animated(child, **kwargs):

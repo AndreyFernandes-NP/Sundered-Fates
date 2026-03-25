@@ -1,10 +1,5 @@
-﻿# The script of the game goes in this file.
-
-# Declare characters used by this game. The color argument colorizes the
-# name of the character.
-
-define e = Character("Eileen")
-
+﻿init python:
+    
 
 # The game starts here.
 
@@ -32,10 +27,81 @@ label start:
 
     return
 
-# Maybe create one for menus too? Depends if I really need it.
 label iscene(target):
     $ scene_register(target)
+    $ last_visited_label = target
     call expression target from _call_expression
+    
+    return
+
+# Simple version of the imenu aka its first version lol
+label simenu(target, deafen=False, jump_to=""):
+    python:
+        scene_register(target)
+        last_visited_label = target
+        if deafen:
+            renpy.music.set_volume(0.3, 1.0, "music") 
+            renpy.music.set_volume(0.3, 1.0, "ambient")
+    call expression target from _call_expression_3
+    python:
+        if deafen: 
+            renpy.music.set_volume(1.0, 1.0, "music") 
+            renpy.music.set_volume(1.0, 1.0, "ambient")
+
+    if jump_to:
+        jump expression jump_to from _jump_expression_1
+
+    # use this as $ destination = simenu("choice_label")
+    return _return
+
+label imenu(target, followup=None, fallback=None, deafen=False):
+    python:
+        scene_register(target)
+        last_visited_label = target
+
+        if deafen:
+            renpy.music.set_volume(0.3, 1.0, "music")
+            renpy.music.set_volume(0.3, 1.0, "ambient")
+
+    call expression target from _call_expression_1
+
+    python:
+        choice_result = _return
+
+        if deafen:
+            renpy.music.set_volume(1.0, 1.0, "music")
+            renpy.music.set_volume(1.0, 1.0, "ambient")
+
+        if isinstance(choice_result, dict):
+            route_data = choice_result
+            
+        else:
+            followup = route_db.get(followup, {}) if isinstance(followup, str)
+
+            if isinstance(followup, dict):
+                route_data = followup.get(choice_result, fallback)
+            else:
+                route_data = fallback
+
+        if route_data is None:
+            route_data = {"action": "return"}
+
+        if isinstance(route_data, str):
+            route_data = {"action": "call", "target": route_data}
+
+        action = route_data.get("action", "return")
+        route_target = route_data.get("target", "")
+
+        extra_set = route_data.get("set", {})
+        for key, value in extra_set.items():
+            setattr(store, key, value)
+        
+    if action == "call" and route_target:
+        call expression route_target from _call_expression_2
+        return
+
+    elif action == "jump" and route_target:
+        jump expression route_target from _jump_expression
     
     return
 
