@@ -1,9 +1,9 @@
 ################################################################################
 ## ROUTES FILES
 ##
-## Basically all of the relevant choices you'll get to choose between
-## each scene and arc. Everything's inside a single defined variable,
-## but it's well organized enough for me to keep track on. Beware of spoilers!
+## Basically all of the relevant choices you'll get to choose between each
+## scene and arc. Everything's inside a single defined variable, but it's
+## well organized enough for me to keep track on. Beware of spoilers!
 ################################################################################
 
 ## Example data format
@@ -25,7 +25,7 @@
 ## return {"action": "jump", "target": "hub_main"}
 ## and it'll work the same as the general use-case.
 
-default route_db = {
+define rts_db = {
     "templateChoice": {
         "option1": {"action": "call", "target": "go_to_this_label"},
         "option2": {"action": "call", "target": "go_to_another_label"},

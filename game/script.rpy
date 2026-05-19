@@ -30,6 +30,8 @@ label start:
 label iscene(target):
     $ scene_register(target)
     $ last_visited_label = target
+    $ check_event(target)
+    
     call expression target from _call_expression
     
     return
@@ -76,7 +78,7 @@ label imenu(target, followup=None, fallback=None, deafen=False):
             route_data = choice_result
             
         else:
-            followup = route_db.get(followup, {}) if isinstance(followup, str)
+            followup = rts_db.get(followup, {}) if isinstance(followup, str)
 
             if isinstance(followup, dict):
                 route_data = followup.get(choice_result, fallback)
