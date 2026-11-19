@@ -2,9 +2,14 @@ default persistent.choosen_language = False
 default persistent.endings_unlocked = []
 default current_llm_job = None
 default seen_labels = set()
+default seen_events = set()
+default evs_flags = set()
+default evs_variables = {}
 default routes_number = []
 
 init -2 python:
+    renpy.music.register_channel("ambient", "sfx", loop=True, tight=True)
+
     def scene_register(label_name):
         if label_name not in store.seen_labels:
             store.seen_labels.add(label_name)
@@ -23,6 +28,7 @@ init -2 python:
 
     # Vars
     from_splash = False
+    last_visited_label = None
 
     # Other functions
     def chroma_animated(child, **kwargs):
