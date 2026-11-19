@@ -1,11 +1,11 @@
 ################################################################################
 ## EVENTS FILE
 ##
-## Welcome to the Event Dispatcher System, or EDS for short! This is where all the 
-## magic happens when scenes get called and we need to check for events and trigger
-## any of them. It works by storing dictionary formatted data about events, their
-## conditions and their effects, and then checking for when the player enters their
-## specific scene or context, so that makes sure only the right stuff gets triggered.
+## Welcome to the Event Dispatcher System, or EDS for short! This is where all of 
+## the magic happens when scenes get called and we need to check them for events to
+## trigger. It works by storing dictionary formatted data about the events, their
+## conditions, effects, and then compare for when the player enters their specific
+## scene/context, making sure only the right stuff gets triggered at a time.
 ## Spoiler Alert: even though the ids are the only most spoiler-y part, it could still
 ## reveal heavily story related stuff, so beware if you don't want to get spoiled!
 ################################################################################
@@ -19,11 +19,10 @@ init -2 python:
         scene = ev["scene"]
         ev_id = ev["id"]
 
-        if scene not in EVENTS_BY_SCENE:
-            EVENTS_BY_SCENE[scene] = []
+        events = EVENTS_BY_SCENE.setdefault(scene, [])
 
-            if ev_id not in EVENTS_BY_SCENE[scene]:
-                EVENTS_BY_SCENE[scene].append(ev)
+        if not any(existing["id"] == ev_id for existing in events):
+            events.append(ev)
 
     def sort_events():
         for key, events in EVENTS_BY_SCENE.items():
@@ -78,14 +77,6 @@ init -2 python:
 
         return False
 
-    # Register all events from the evs_db into the system.
-    # Even though the event data is stored in another variable, we need to add it to the system's internal storage for it to work,
-    # and then sort it by priority. I prefer it this way cus I have a more visual organization of events per scene in the evs_db.
-    for ev_list in evs_db.values():
-        for ev in ev_list:
-            add_event(ev)
-    sort_events()
-
 
 ## Event data structure explanation:
 # Each event in evs_db is organized by scene, containing a set of event dictionaries.
@@ -131,7 +122,7 @@ init -2 python:
 # }
 
 define evs_db = {
-    "templateScene": {
+    "templateScene": [
         {
             "id": "templatescene_ev01",
             "scene": "templateScene",
@@ -159,9 +150,17 @@ define evs_db = {
             "condition": lambda: "templateFlag" in store.evs_flags,
             "effect": lambda: renpy.notify("Event 3 triggered!"),
         },
-    }
+    ]
 }
 
 init python:
+    # Register all events from the evs_db into the system.
+    # Even though the event data is stored in another variable, we need to add it to the system's internal storage for it to work,
+    # and then sort it by priority. I prefer it this way cus I have more of a visual organization of events per scene in the evs_db.
+    for ev_list in evs_db.values():
+        for ev in ev_list:
+            add_event(ev)
+    sort_events()
+
     # Function database for events that conditions and effects can call. 
     # This is just to avoid having too much code in the lambda functions inside the event definitions, which can get messy.

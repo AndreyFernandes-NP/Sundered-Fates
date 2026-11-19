@@ -8,6 +8,8 @@ default evs_variables = {}
 default routes_number = []
 
 init -2 python:
+    renpy.music.register_channel("ambient", "sfx", loop=True, tight=True)
+
     def scene_register(label_name):
         if label_name not in store.seen_labels:
             store.seen_labels.add(label_name)

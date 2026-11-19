@@ -32,15 +32,28 @@ init python:
         {"id": "sel", "power": 1, "agi": 1, "vit": 1}
     ]
 
-    for data in characters:
-        ch_db[data["id"]] = charRegister(
-            char_id=data["id"],
-            power=data["power"],
-            agi=data["agi"],
-            vit=data["vit"]
-        )
+    def register_characters():
+        for data in characters:
+            char_id = data["id"]
+
+            if char_id not in ch_db:
+                ch_db[char_id] = charRegister(
+                    char_id=char_id,
+                    power=data["power"],
+                    agi=data["agi"],
+                    vit=data["vit"]
+                )
     
-    # if "cb" in ch_db: pass # if example for function
+        # if "cb" in ch_db: pass # if example for function
+    
+    def register_character(char_id, power=1, agi=1, vit=1):
+        if char_id not in ch_db:
+            ch_db[char_id] = charRegister(
+                char_id=char_id,
+                power=power,
+                agi=agi,
+                vit=vit
+            )
 
 ### ALL CHARACTERS CURRENTLY IN THE GAME
 ## - Prologue
