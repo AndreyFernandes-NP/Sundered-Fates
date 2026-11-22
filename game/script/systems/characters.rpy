@@ -27,6 +27,9 @@ init python:
     ## Each character gets stats like Power (strength?), Agility (speed?), Vitality (health?),
     ## don't know for sure what they mean rn as I still need to finish the combat system.
     characters = [
+        {"id": "testing_dummy", "power": 1, "agi": 1, "vit": 1},
+        {"id": "average_dummy", "power": 3, "agi": 3, "vit": 3},
+        {"id": "strong_dummy", "power": 6, "agi": 6, "vit": 6},
         {"id": "nerfed_cb", "power": 1, "agi": 1, "vit": 1},
         {"id": "cb", "power": 6, "agi": 9, "vit": 69},
         {"id": "sel", "power": 1, "agi": 1, "vit": 1}

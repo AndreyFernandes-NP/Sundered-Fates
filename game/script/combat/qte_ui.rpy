@@ -1,116 +1,196 @@
-################################################################################
-## QTE UI
-##
-## Just simply displays the active buttons and forwards their inputs to the manager
-################################################################################
+init python:
+    import time
 
-transform qte_approach(duration=1.0, base_scale=1.0):
+    renpy.add_layer("qte_scene", below="screens", menu_clear=True)
 
-    subpixel True
-    alpha 0.0
-    zoom (base_scale * 3)
+    def qte_ui_signature(session):
+        interaction = session.qte.current
 
-    # this fucking thing took me an hour to complete it
-    parallel:
-        linear (duration * ((base_scale * 3) - (base_scale*0.75)) / ((base_scale * 3) - 0.01)) zoom (base_scale*0.75)
-    
-    parallel:
-        linear min(0.2 + (duration / 10), 0.5) alpha 1.0
+        return (session.state, interaction, None if interaction is None else interaction.view_revision, session.stage.revision)
 
-        time (duration * ((base_scale * 3) - (base_scale * 0.75)) / ((base_scale * 3) - 0.01))
-        alpha 0.0
+    def qte_ui_clock_reset(session):
+        session._qte_tick_at = None
+        session._qte_ui_signature = None
 
-screen qte_single_screen(manager):
+    def qte_ui_begin(session):
+        qte_ui_clock_reset(session)
+
+        session._qte_ui_signature = qte_ui_signature(session)
+
+    def qte_ui_refresh(session):
+        signature = qte_ui_signature(session)
+
+        if signature != session._qte_ui_signature:
+            session._qte_ui_signature = signature
+
+            renpy.restart_interaction()
+
+    def qte_ui_tick(session, input_name=None):
+        if(renpy.context_nesting_level() != getattr(session, "_qte_context_depth", 0)):
+            session._qte_tick_at = None
+            return None
+
+        result = None
+
+        if session.state == "active":
+            now = time.monotonic()
+
+            dt = (0.0 if session._qte_tick_at is None else max(0.0, now - session._qte_tick_at))
+            session._qte_tick_at = now
+
+            result = session.update(dt, input_name)
+
+        else:
+            session._qte_tick_at = None
+
+        if result is None:
+            qte_ui_refresh(session)
+
+        return result
+
+    def qte_ui_input(session, group, control, input_name, **data):
+        if (session.state != "active" or session.qte.current is not group or control not in group.active or control.result is not None):
+            return None
+
+        return qte_ui_tick(session, {"uid": control.uid, "name": input_name, "data": data})
+
+    def qte_ui_toggle_pause(session):
+        if session.state == "paused":
+            session.resume()
+
+        else:
+            result = qte_ui_tick(session)
+
+            if result is not None:
+                return result
+
+            session.pause()
+
+        qte_ui_refresh(session)
+
+        return None
+
+    def qte_ui_after_load():
+        if qte_active_session is not None:
+            qte_ui_clock_reset(qte_active_session)
+
+    config.after_load_callbacks.append(qte_ui_after_load)
+
+screen qte_scene_view(session):
+    layer "qte_scene"
+    zorder -1
+
+    on "show" action Function(qte_ui_begin, session, _update_screens=False)
+    timer 0.01 repeat True action Function(qte_ui_tick, session, _update_screens=False)
+
+    $ current = session.qte.current
+    $ mirrored = current is not None and current.definition.get("mirrored", False)
+
+    for actor_id, slot index (actor_id, slot["serial"]) in session.stage.draw_order():
+        $ actor_mirrored = mirrored and slot["follow_mirror"]
+
+        add slot["playback"].view:
+            pos (slot["x"], slot["y"])
+            anchor (0.5, 0.5)
+
+            at Transform(xzoom=-1 if actor_mirrored else 1)
+
+screen qte_wait_screen(session):
     modal True
     zorder 200
 
-    on "show" action Function(manager.start)
+    on "show" action Function(qte_ui_begin, session, _update_screens=False)
 
-    timer 0.01 repeat True action Function(manager.tick, _update_screens=False)
+    key "dismiss" action NullAction()
+    key "game_menu" action NullAction()
+    key "rollback" action NullAction()
+    key "skip" action NullAction()
+    key "toggle_skip" action NullAction()
+
+screen qte_interaction_screen(session):
+    modal True
+    zorder 200
+
+    on "show" action Function(qte_ui_begin, session, _update_screens=False)
 
     key "game_menu" action NullAction()
     key "rollback" action NullAction()
     key "skip" action NullAction()
     key "toggle_skip" action NullAction()
 
-    # This is our hint line that points towards the next button IF it's true
-    if (manager.hint_line and manager.pattern in ("chain", "timed") and manager.active_buttons and manager.pending_buttons):
-        use qte_hint_line(manager.active_buttons[-1], manager.pending_buttons[0], manager.hint_line_ratio, manager.hint_line_max_px)
+    $ interaction = session.qte.current
 
-    # Each button is its own screen bindable to this screen
-    for btn index btn.uid in manager.active_buttons:
-        use qte_button_screen(manager, btn)
+    if interaction is not None:
+        use expression interaction.screen_name pass (session, interaction)
 
-screen qte_button_screen(manager, btn):
-    $ button_size = max(1, int(256 * btn.scale * 3))
+screen qte_hint_line(source, target, ratio=0.5, max_px=180):
+    $ sx = source["x"] * config.screen_width
+    $ sy = source["y"] * config.screen_height
 
-    fixed:
-        pos (btn.xpos, btn.ypos)
-        anchor (0.5, 0.5)
+    $ dx = (target["x"] - source["x"]) * config.screen_width
+    $ dy = (target["y"] - source["y"]) * config.screen_height
 
-        xysize (button_size, button_size)
-
-        add "images/testing/ui/zoom_circle.png" at qte_approach(btn.timeout, btn.scale):
-            align (0.5, 0.5)
-
-        python:
-            if btn.timeout > 2:
-                fade_duration = btn.timeout / 10
-            else:
-                fade_duration = 0.2
-            
-            fade_duration = min(fade_duration, 0.5)
-
-        imagebutton:
-            idle btn.image
-            hover btn.image
-
-            align (0.5, 0.5)
-            focus_mask None
-            keysym None
-
-            at transform:
-                zoom btn.scale
-                alpha 0.0
-                linear fade_duration alpha 1.0
-
-            action Function(manager.click, btn.uid)
-
-screen qte_hint_line(source, target, ratio=0.4, max_px=150):
-    # Osu! like line between each button
-
-    # This is the distance between curr and next button
-    $ dx = target.xpos - source.xpos
-    $ dy = target.ypos - source.ypos
     $ distance = math.hypot(dx, dy)
 
     if distance > 0:
         $ length = min(distance * ratio, max_px)
         $ angle = math.degrees(math.atan2(dy, dx))
 
-        $ mid_x = source.xpos + (dx / distance) * (length / 2)
-        $ mid_y = source.ypos + (dy / distance) * (length / 2)
+        $ mid_x = sx + dx / distance * length / 2
+        $ mid_y = sy + dy / distance * length / 2
 
-        # Glow
         add "images/testing/ui/hint_line_glow.png":
             pos (absolute(mid_x), absolute(mid_y))
             anchor (0.5, 0.5)
             xysize (max(1, int(length)), 16)
-            at Transform(
-                rotate=angle,
-                rotate_pad=False,
-                alpha=0.4
-            )
-        
-        # Line
+
+            at Transform(rotate=angle, rotate_pad=False, alpha=0.4)
+
         add "images/testing/ui/hint_line.png":
             pos (absolute(mid_x), absolute(mid_y))
             anchor (0.5, 0.5)
             xysize (max(1, int(length)), 4)
-            at Transform(
-                rotate=angle,
-                rotate_pad=False,
-                alpha=0.9
-            )
 
-# okay I pull up hop on after the party
+            at Transform(rotate=angle, rotate_pad=False, alpha=0.9)
+
+screen qte_click_control(session, group, interaction):
+    $ definition = interaction.definition
+    $ visual = interaction.visual
+
+    fixed:
+        pos (
+            float(definition.get("x", 0.5)),
+            float(definition.get("y", 0.6)),
+        )
+
+        anchor (0.5, 0.5)
+        xysize (visual.box_size, visual.box_size)
+
+        if visual.skin["approach"] is not None:
+            add visual.skin["approach"]:
+                align (0.5, 0.5)
+                at Transform(function=visual.animate_approach, subpixel=True, xzoom=-1 if definition.get("mirrored", False) else 1)
+
+        imagebutton:
+            idle visual.skin["idle"]
+            hover visual.skin["hover"]
+            insensitive visual.skin["idle"]
+
+            align (0.5, 0.5)
+            padding (0, 0)
+            focus_mask None
+            keysym None
+            sensitive session.state == "active"
+
+            at Transform(function=visual.animate_button, subpixel=True, xzoom=-1 if definition.get("mirrored", False) else 1)
+
+            action Function(qte_ui_input, session, group, interaction, "click", _update_screens=False)
+
+screen qte_pattern_control(session, group):
+    $ link = group.hint_link()
+
+    if link is not None:
+        use qte_hint_line(link[0], link[1], group.definition.get("hint_line_ratio", 0.5), group.definition.get("hint_line_max_px", 180))
+
+    for control index control.uid in group.active:
+        use expression control.screen_name pass (session, group, control)

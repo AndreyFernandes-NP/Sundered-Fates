@@ -1,73 +1,138 @@
-################################################################################
-## QTE ASSETS
-##
-## Finds the images that belong to a QTE animation and puts them in order
-## basically, we give it a path like "images/combat/dummy/dummy_up" and it
-## looks for dummy_up.png, dummy_up2.png, dummy_up3.png and so on.
-## This is just a setup for the image list, everything else is handled by qte_visuals
-################################################################################
-
 init -10 python:
+    import re
+    import posixpath
+
+    SF_ASSETS = tuple(renpy.list_files())
+    QTE_FRAME_CACHE = {}
+
+    QTE_IMAGE_EXTENSIONS = {
+        ".png",
+        ".webp",
+        ".jpg",
+        ".jpeg",
+        ".svg",
+    }
+
+    def qte_clip(source, duration=None, loop=False, scale=1.0, fit=False):
+        """Describes a visual resource without starting its playback"""
+
+        return {
+            "source": source,
+            "duration": duration,
+            "loop": loop,
+            "scale": scale,
+            "fit": fit,
+        }
     
-    def qte_get_frames(base_path: str):
-        frames_by_number = {}
-        extensions = [".png", ".jpg", ".jpeg", ".gif"]
+    def qte_natural_key(value):
+        """Sorts numbered names naturally, like name2 will always come first than name10"""
 
-        for file_path in renpy.list_files():
-            if "." not in file_path:
+        return tuple((1, int(part)) if part.isdecimal() else (0, part.lower()) for part in re.split(r"(\d+)", value))
+
+    def qte_get_frames(source):
+        """Finds an ordered frame sequence by a prefix or directory"""
+
+        source = source.replace("\\", "/")
+
+        if source in QTE_FRAME_CACHE:
+            return QTE_FRAME_CACHE[source]
+        
+        found = {}
+        directory = source.endswith("/")
+
+        pattern = re.compile(re.escape(source) + r"(?:[_-]?(\d+))?$")
+
+        for path in SF_ASSETS:
+            stem, ext = posixpath.splitext(path)
+
+            if ext.lower() not in QTE_IMAGE_EXTENSIONS:
                 continue
 
-            name, ext = file_path.rsplit(".", 1)
-
-            # Check if the file path starts with the base path and has a valid extension
-            if ext.lower() not in [e[1:] for e in extensions]:
-                continue
-            
-            if not name.startswith(base_path):
-                continue
-
-            # Keep only the part after the requested animation name
-            # 'dummy_up3.png' turns into '3' as an example.
-            suffix = name[len(base_path):]
-
-            if suffix == "":
-                frame_number = 1
-            
-            elif suffix.isdecimal():
-                frame_number = int(suffix)
+            if directory:
+                if posixpath.dirname(path) + "/" != source:
+                    continue
+                
+                key = qte_natural_key(posixpath.basename(stem))
             
             else:
-                # Something like "_attack" belongs to another animation and not this
-                continue
-            
-            # Check if the frame number is valid and not already in the list
-            if frame_number < 1:
-                if config.developer:
-                    renpy.log(f"QTE: Ignoring frame {file_path} because its number is less than 1.")
+                match = pattern.fullmatch(stem)
 
-                continue
+                if match is None:
+                    continue
+                
+                key = (int(match.group(1)) if match.group(1) else 1)
 
-            # Also check if the frame number is already in the list to avoid duplicates in any case
-            if frame_number in frames_by_number:
-                if config.developer:
-                    renpy.log(f"QTE: Ignoring frame {file_path} because its number is already in the list.")
+            qte_require(key not in found, "Ambiguous animation frame: " + path)
 
-                continue
+            found[key] = path
 
-            frames_by_number[frame_number] = file_path
+        result = tuple(found[key] for key in sorted(found))
+        qte_require(bool(result), "No frames found for: " + source)
+
+        QTE_FRAME_CACHE[source] = result
         
-        if not frames_by_number:
-            if config.developer:
-                renpy.log(f"QTE: No frames found for base path '{base_path}'.")
-            
-            return {}
+        return result
+    
+    def qte_resolve_clip(value, duration=None):
+        """Creates a clip based on a filename, sequence of frames or any images in Ren'py"""
         
-        frames = []
+        if isinstance(value, str):
+            value = {"source": value}
+        
+        qte_require(isinstance(value, builtins.dict), "A clip must be a string or an object")
 
-        for frame_number in sorted(frames_by_number.keys()):
-            frames.append(frames_by_number[frame_number])
+        allowed = {
+            "source",
+            "duration",
+            "loop",
+            "scale",
+            "fit",
+        }
+
+        qte_require({"source"} <= set(value) <= allowed, "Invalid fields in clip section, got: %r" % repr(value))
+
+        clip = qte_clip(value["source"])
+        clip.update(value)
+
+        if duration is not None:
+            clip["duration"] = duration
         
-        if config.developer:
-            renpy.log(f"QTE: Found {len(frames)} frames for base path '{base_path}': {frames}")
+        source = clip["source"]
+
+        qte_require(isinstance(source, str) and bool(source.strip()), "Invalid clip source: %r" % repr(source))
+
+        source = source.strip().replace("\\", "/")
+        clip["source"] = source
+
+        for key in ("loop", "fit"):
+            qte_require(type(clip[key]) is bool, key + " must be boolean")
         
-        return frames
+        qte_require(qte_number(clip["scale"]) and clip["scale"] > 0, "Invalid clip scale")
+
+        ext = posixpath.splitext(source)[1].lower()
+
+        if ext in QTE_IMAGE_EXTENSIONS:
+            qte_require(renpy.loadable(source), "Image file not found: " + source)
+
+            clip["kind"] = "frames"
+            clip["frames"] = (source,)
+        
+        elif "/" not in source and renpy.has_image(source, exact=True):
+            clip["kind"] = "native"
+            clip["frames"] = ()
+        
+        else:
+            clip["kind"] = "frames"
+            clip["frames"] = qte_get_frames(source)
+
+            if clip["duration"] is None:
+                clip["duration"] = 1.0
+        
+        length = clip["duration"]
+
+        qte_require(length is None or (qte_number(length) and length > 0), "Clip duration must be a positive integer or None")
+
+        if clip["loop"]:
+            qte_require(clip["kind"] == "frames" and length is not None, f"If '{clip["kind"]}' is 'frames' you should have a valid duration and frames for a loop, else, you must define any loop inside the ATL, definite this as false instead")
+
+        return clip

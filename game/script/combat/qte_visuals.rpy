@@ -1,117 +1,107 @@
-################################################################################
-## QTE VISUALS
-##
-## Takes an ordered image list and plays it as a single animation
-## the duration belongs to the whole (like HOLE) animation, so adding more frames
-## makes the movement more detailed/fluid without making it take longer.
-################################################################################
+init -5 python:
+    QTE_SKINS = {
+        "default": {
+            "idle": "images/testing/ui/qte_test.png",
+            "hover": None,
+            "approach": "images/testing/ui/zoom_circle.png",
+            "scale": 1.0,
+            "base_size": 256,
+        },
 
-init -10 python:
-    import math
-    from collections.abc import Mapping
+        "small_d": {
+            "scale": 0.5,
+        }
+    }
 
-    renpy.add_layer("combat_visuals", below="screens")
+    def qte_skin(name="default", overrides=None):
+        """Copies a preset and applies any local overrides to the button skin"""
 
-    class QTEVisual(renpy.Displayable):
+        qte_require(isinstance(name, str) and name in QTE_SKINS, "Unknown QTE skin: " + repr(name))
 
-        def __init__(self, frames, duration=1.0, scale=1.0, mirrored=False, **kwargs):
-            super().__init__(**kwargs)
+        if overrides is None:
+            overrides = {}
 
-            self.duration = duration
-            self.scale = scale
-            self.mirrored = bool(mirrored)
+        qte_require(isinstance(overrides, builtins.dict), "Visual override must be an object, instead got %r" % repr(overrides))
 
-            if not math.isfinite(self.duration) or self.duration <= 0:
-                raise ValueError("[QTE VISUALS] Duration must be a positive number, got %r." % (self.duration))
-            
-            if not math.isfinite(self.scale) or self.scale <= 0:
-                raise ValueError("[QTE VISUALS] Scale must be a positive number, got %r." % (self.scale))
-            
-            if not frames or not isinstance(frames, (list, tuple)):
-                raise ValueError("[QTE VISUALS] Frames must be a non-empty list or tuple, got %r." % (frames))
-            
-            self.frames = []
+        skin = dict(QTE_SKINS["default"])
+        skin.update(QTE_SKINS[name])
+        skin.update(overrides)
 
-            for frame_path in frames:
-                # We use Transform here to ensure that the image is scaled to fit the screen, while maintaining its aspect ratio
-                image = Transform(frame_path, xysize=(config.screen_width, config.screen_height), fit="contain", zoom=self.scale, xzoom=-1.0 if self.mirrored else 1.0)
-                self.frames.append(image)
-            
-            self.frame_duration = self.duration / len(self.frames)
+        allowed = {
+            "idle",
+            "hover",
+            "approach",
+            "scale",
+            "base_size",
+        }
+
+        qte_require(set(skin) <= allowed, "There are unknown fields present in QTE skin, got: %r" % repr(skin))
+        qte_require(isinstance(skin["idle"], str) and bool(skin["idle"].strip()), "A skin needs at least an idle image")
+
+        for key in ("hover", "approach"):
+            value = skin[key]
+
+            qte_require(value is None or (isinstance(value, str) and bool(value.strip())), key + " must be an image name/path or None")
         
-        def visit(self):
-            # A way to let Ren'Py know that this displayable can show
-            return self.frames
+        scale = skin["scale"]
+
+        qte_require(qte_number(scale) and scale > 0, "Skin scale must be a positive number")
+
+        if skin["approach"] is not None:
+            qte_require(scale * 0.75 > 0.01, "Approach scale is too small for the approaching formula, must be bigger than 0.1")
+        
+        qte_require(type(skin["base_size"]) is int and skin["base_size"] > 0, "Skin base_size must be a positive integer")
+
+        if skin["hover"] is None:
+            skin["hover"] = skin["idle"]
+        
+        return skin
     
-        def render(self, width, height, st, at):
-            # st is how long this displayable has been shown for, in seconds
-            # once we reach the end of it, keep showing the last frame by default
+    class QTEButtonVisual:
+        """Display an interaction button with specific skin values"""
 
-            frame_index = min(int(st / self.frame_duration), len(self.frames) - 1)
-            frame = self.frames[frame_index]
+        def __init__(self, interaction):
+            self.interaction = interaction
+            definition = interaction.definition
 
-            frame_render = renpy.render(frame, width, height, st, at)
-            result = renpy.Render(width, height)
+            self.skin = qte_skin(definition.get("skin", "default"), definition.get("visual"))
+            self.scale = float(self.skin["scale"])
+            self.box_size = max(1, int(self.skin["base_size"] * self.scale * 3))
+            duration = interaction.duration
 
-            frame_width, frame_height = frame_render.get_size()
+            self.button_fade = min(max(0.2, duration / 10.0), 0.5)
+            self.approach_fade = min(0.2 + (duration / 10.0), 0.5)
 
-            x = int((width - frame_width) / 2)
-            y = int((height - frame_height) / 2)
+            self.approach_start = self.scale * 3.0
+            self.approach_end = self.scale * 0.75
+            self.approach_duration = None
 
-            result.blit(frame_render, (x, y))
+            if self.skin["approach"] is not None:
+                self.approach_duration = (duration * (self.approach_start - self.approach_end) / (self.approach_start - 0.01))
 
-            # Schedule the next frame to be drawn, if there is one
-            if frame_index < len(self.frames) - 1:
-                next_frame_at = (frame_index + 1) * self.frame_duration
+        def animate_button(self, trans, st, at):
+            elapsed = max(0.0, self.interaction.elapsed)
 
-                renpy.redraw(self, max(0.001, next_frame_at - st))
+            trans.zoom = self.scale
+            trans.alpha = min(1.0, elapsed / self.button_fade)
 
-            return result
-    
-    def qte_build_visual(data):
-        """
-        Basically what we already do above but automatically,
-        creates new visuals based on a frame path with its animations
-        """
+            return 0.0 if elapsed < self.button_fade else None
 
-        if data is None:
-            return None
+        def animate_approach(self, trans, st, at):
+            elapsed = max(0.0, self.interaction.elapsed)
+            duration = self.approach_duration
 
-        if not isinstance(data, Mapping):
-            raise ValueError(f"[QTE VISUALS] Visual data must be a dictionary, got {data}")
-        
-        path = data.get("path")
+            if duration is None:
+                trans.alpha = 0.0
+                return None
 
-        if not isinstance(path, str) or not path:
-            raise ValueError(f"[QTE VISUALS] A visual needs a non-empty string path, got '{path}'")
-        
-        frames = qte_get_frames(path)
+            progress = min(1.0, elapsed / duration)
+            trans.zoom = self.approach_start + (self.approach_end - self.approach_start) * progress
 
-        if not frames:
-            raise ValueError(f"[QTE VISUALS] No frames found for '{path}'")
-        
-        return QTEVisual(frames, duration=data.get("duration", 0.3), scale=data.get("scale", 1.0), mirrored=data.get("mirrored", False))
+            if elapsed >= duration:
+                trans.alpha = 0.0
+                return None
+            
+            trans.alpha = min(1.0, elapsed / self.approach_fade)
 
-screen qte_visuals_preview(visual):
-    add visual
-
-    textbutton "Close":
-        align (0.98, 0.95)
-        action Hide("qte_visuals_preview")
-
-screen qte_combat_visual(visual):
-    zorder 0
-
-    add visual
-
-screen qte_beat_wait(duration):
-    modal True
-    zorder 201
-
-    timer duration action Return(True)
-
-    key "dismiss" action NullAction()
-    key "game_menu" action NullAction()
-    key "rollback" action NullAction()
-    key "skip" action NullAction()
-    key "toggle_skip" action NullAction()
+            return 0.0

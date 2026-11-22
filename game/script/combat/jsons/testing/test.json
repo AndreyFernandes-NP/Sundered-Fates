@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "op": "say",
+      "what": "Olha o caba vindo! Cuidado pra nao tomar gap"
+    },
+    {
+      "op": "qte",
+      "kind": "click",
+      "id": "parry",
+      "params": {},
+      "source": "player",
+      "target": "goon",
+      "duration": 2.0,
+      "x": 0.5,
+      "y": 0.6,
+      "on_start": [
+        {
+          "op": "show",
+          "actor": "goon",
+          "pose": "ready",
+          "x": 0.5,
+          "y": 0.3
+        }
+      ],
+      "on_success": [
+        {
+          "op": "show",
+          "actor": "goon",
+          "pose": "stagger",
+          "x": 0.5,
+          "y": 0.3
+        }
+      ],
+      "on_failure": [
+        {
+          "op": "show",
+          "actor": "goon",
+          "pose": "hit",
+          "x": 0.5,
+          "y": 0.3
+        }
+      ]
+    },
+    {
+      "op": "branch",
+      "success": [
+        {
+          "op": "say",
+          "what": "Eita lapada seca que tu deu"
+        },
+        {
+          "op": "end",
+          "outcome": "opening"
+        }
+      ],
+      "failure": [
+        {
+          "op": "say",
+          "what": "Oh lee..."
+        },
+        {
+          "op": "end",
+          "outcome": "hit_taken"
+        }
+      ]
+    }
+  ]
+}
