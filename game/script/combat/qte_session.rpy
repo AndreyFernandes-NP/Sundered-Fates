@@ -35,6 +35,7 @@ init -10 python:
 
             self.qte = QTEManager()
             self.stage = QTEStage(self)
+            self.audio = QTEAudio()
 
             self.run = None
             self.qte_results = []
@@ -220,7 +221,7 @@ init -10 python:
                     hook_name = "on_" + event["name"]
 
                     for step in event["definition"][hook_name]:
-                        self.stage.apply(step)
+                        self.apply_feedback(step)
 
                 else:
                     self.run.handle(event)
@@ -253,6 +254,24 @@ init -10 python:
             self.run.close()
             self.run = None
             self._qte_tick_at = None
+        
+        def apply_feedback(self, step):
+            self._require_state("active")
+            op = step["op"]
+
+            if op == "sfx":
+                self.audio.play(step)
+                return None
+
+            if op in ("show", "play"):
+                cues = self.audio.resolve(step.get("sfx"))
+
+                playback = self.stage.apply(step)
+                self.audio.play(cues)
+
+                return playback
+
+            raise ValueError("[QTE SESSION] Unsupported feedback operation: " + repr(op))
         
         def finish(self, outcome):
             """Closes the session and gives the caller its final result"""

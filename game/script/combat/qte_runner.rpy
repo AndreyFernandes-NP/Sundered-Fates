@@ -15,8 +15,8 @@ label qte_execute(session, script, step=None, result=None, prepared=None, playba
     while True:
         $ step = session.run.next_step()
 
-        if step["op"] in ("show", "play"):
-            $ playback = session.stage.apply(step)
+        if step["op"] in ("show", "play", "sfx"):
+            $ playback = session.apply_feedback(step)
 
             if step["op"] == "play" and step.get("wait", True):
                 $ renpy.stop_skipping()

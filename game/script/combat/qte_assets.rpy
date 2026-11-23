@@ -89,7 +89,7 @@ init -10 python:
             "fit",
         }
 
-        qte_require({"source"} <= set(value) <= allowed, "Invalid fields in clip section, got: %r" % repr(value))
+        qte_require({"source"} <= set(value) <= allowed, "Invalid fields in clip section, got: %r" % (value,))
 
         clip = qte_clip(value["source"])
         clip.update(value)
@@ -99,7 +99,7 @@ init -10 python:
         
         source = clip["source"]
 
-        qte_require(isinstance(source, str) and bool(source.strip()), "Invalid clip source: %r" % repr(source))
+        qte_require(isinstance(source, str) and bool(source.strip()), "Invalid clip source: %r" % (source,))
 
         source = source.strip().replace("\\", "/")
         clip["source"] = source

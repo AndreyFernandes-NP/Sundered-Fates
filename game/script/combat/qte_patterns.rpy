@@ -42,7 +42,7 @@ init -5 python:
             visual = dict(step.get("visual") or {})
             local_visual = extra.get("visual", {})
 
-            qte_require(isinstance(local_visual, builtins.dict), "Button visual must be an object, instead of: %r" % repr(local_visual))
+            qte_require(isinstance(local_visual, builtins.dict), "Button visual must be an object, instead of: %r" % (local_visual,))
 
             visual.update(local_visual)
 
@@ -134,27 +134,27 @@ init -5 python:
     def qte_validate_pattern(step, session):
         name = step.get("pattern", "single")
 
-        qte_require(isinstance(name, str) and name in QTE_PATTERN_TYPES, "Unknown type of QTE pattern, received: " + name + ", use one of these: %r" % repr(QTE_PATTERN_TYPES))
+        qte_require(isinstance(name, str) and name in QTE_PATTERN_TYPES, "Unknown type of QTE pattern, received: " + name + ", use one of these: %r" % QTE_PATTERN_TYPES)
 
         threshold = step.get("threshold", 1.0)
         interval = step.get("interval", 0.4)
 
         qte_require(qte_number(threshold) and 0 < threshold <= 1, "threshold must be in between 0 and 1")
-        qte_require(qte_number(interval) and interval > 0, "intervals must always be positive, received: %r" % repr(interval))
+        qte_require(qte_number(interval) and interval > 0, "intervals must always be positive, received: %r" % (interval,))
         qte_require(type(step.get("hint_line", False)) is bool, "hint_line must be a boolean, 'true' or 'false'")
 
         ratio = step.get("hint_line_ratio", 0.5)
         pixels = step.get("hint_line_max_px", 180)
 
-        qte_require(qte_number(ratio) and 0 < ratio <= 1, "Invalid hint line ratio, be sure it's between 0 and 1 and not 0, got: %r" % repr(ratio))
-        qte_require(qte_number(pixels) and pixels > 0, "Invalid hint line length, should always be a positive value, received: %r" % repr(pixels))
+        qte_require(qte_number(ratio) and 0 < ratio <= 1, "Invalid hint line ratio, be sure it's between 0 and 1 and not 0, got: %r" % (ratio,))
+        qte_require(qte_number(pixels) and pixels > 0, "Invalid hint line length, should always be a positive value, received: %r" % (pixels,))
 
         controls = qte_build_controls(step)
 
         for control in controls:
             qte_validate_control(control, session)
 
-        qte_require(len({c["id"] for c in controls}) == len(controls), "Duplicated IDs present, check any of your calls for the same id, got: %r" % repr(controls))
+        qte_require(len({c["id"] for c in controls}) == len(controls), "Duplicated IDs present, check any of your calls for the same id, got: %r" % controls)
 
         QTE_PATTERN_TYPES[name].validate(step, controls)
 
@@ -233,7 +233,7 @@ init -5 python:
                     "data": {},
                 }
 
-            qte_require(isinstance(packet, builtins.dict), "Invalid input packet, received: %r" % repr(packet))
+            qte_require(isinstance(packet, builtins.dict), "Invalid input packet, received: %r" % (packet,))
 
             self._input = packet
 

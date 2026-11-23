@@ -21,7 +21,7 @@ init -5 python:
         if overrides is None:
             overrides = {}
 
-        qte_require(isinstance(overrides, builtins.dict), "Visual override must be an object, instead got %r" % repr(overrides))
+        qte_require(isinstance(overrides, builtins.dict), "Visual override must be an object, instead got %r" % (overrides,))
 
         skin = dict(QTE_SKINS["default"])
         skin.update(QTE_SKINS[name])
@@ -35,7 +35,7 @@ init -5 python:
             "base_size",
         }
 
-        qte_require(set(skin) <= allowed, "There are unknown fields present in QTE skin, got: %r" % repr(skin))
+        qte_require(set(skin) <= allowed, "There are unknown fields present in QTE skin, got: %r" % skin)
         qte_require(isinstance(skin["idle"], str) and bool(skin["idle"].strip()), "A skin needs at least an idle image")
 
         for key in ("hover", "approach"):

@@ -57,6 +57,6 @@ init -5 python:
         qte_require(isinstance(name, str) and name in QTE_LAYOUTS, 
                     "Unknown QTE Layout received, got: %r\nList of available layouts: %r" % (name, list(QTE_LAYOUTS)))
         qte_require(isinstance(spread, (builtins.list, tuple)) and len(spread) == 2 and all(qte_number(v) and 0 <= v <= 1 for v in spread), 
-                    "Spread needs two numbers from 0 to 1, instead got: %r" % repr(spread))
+                    "Spread needs two numbers from 0 to 1, instead got: %r" % (spread,))
 
         return QTE_LAYOUTS[name](count, step.get("x", 0.5), step.get("y", 0.6), spread, randomize)

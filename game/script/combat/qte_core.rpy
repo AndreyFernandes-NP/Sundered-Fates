@@ -17,7 +17,7 @@ init -10 python:
 
         def start(self, definition):
             if self.current is not None:
-                raise RuntimeError("[QTE CORE] Finish the previous instance before calling it again: %r" % (self.current))
+                raise RuntimeError("[QTE CORE] Finish the previous instance before calling it again: %r" % (self.current,))
             
             self.current = QTEPatternRun(definition)
             self.announced = False

@@ -15,6 +15,12 @@ init 1 python:
         "parry": qte_clip("images/testing/player/player_test_parry", duration=0.3, fit=True),
     }
 
+    sfx_test = [
+        "audio/sounds/testing/sword_test_1",
+        "audio/sounds/testing/sword_test_2",
+        "audio/sounds/testing/sword_test_3",
+    ]
+
     demo = qte_script(
             qte_show("enemy", "idle", x=0.5, y=0.5),
             qte_show("player", "idle", y=0.65, scale=0.75),
@@ -25,7 +31,7 @@ init 1 python:
                 duration=1.0,
                 skin="small_d",
                 on_start=(qte_play("enemy", "prepare")),
-                on_success=(qte_play("player", "parry", wait=False, then="idle"), qte_play("enemy", "attack", then="idle")),
+                on_success=(qte_play("player", "parry", wait=False, then="idle", sfx=qte_sfx(sfx_test, volume=0.3)), qte_play("enemy", "attack", then="idle")),
             ),
 
             qte_say(what="Burst"),
@@ -49,8 +55,8 @@ init 1 python:
                 duration=0.7,
                 skin="small_d",
                 on_start=(qte_play("enemy", "prepare")),
-                on_press=(qte_play("enemy", "attack", duration=0.2, then="prepare", then_duration=0.3), qte_play("player", "parry", duration=0.2, then="idle")),
-                on_miss=qte_play("enemy", "attack", duration=0.1, then="idle", then_duration=0.2),
+                on_press=(qte_play("enemy", "attack", duration=0.2, then="prepare", then_duration=0.3, sfx=qte_sfx(sfx_test, volume=0.3)), qte_play("player", "parry", duration=0.2, then="idle")),
+                on_miss=qte_play("enemy", "attack", duration=0.1, then="prepare", then_duration=0.2),
                 on_end=qte_play("enemy", "idle", wait=False),
                 layout="random",
                 hint_line=True,
@@ -64,8 +70,9 @@ init 1 python:
                 interval=0.3,
                 duration=1.0,
                 threshold=0.8,
-                on_press=(qte_play("enemy", "attack", duration=0.2, then="prepare", then_duration=0.3), qte_play("player", "parry", duration=0.2, then="idle")),
-                on_miss=qte_play("enemy", "attack", duration=0.1, then="idle", then_duration=0.2),
+                on_start=(qte_play("enemy", "prepare")),
+                on_press=(qte_play("enemy", "attack", duration=0.2, then="prepare", then_duration=0.3, sfx=qte_sfx(sfx_test, volume=[0.3, 0.4, 0.3])), qte_play("player", "parry", duration=0.2, then="idle")),
+                on_miss=qte_play("enemy", "attack", duration=0.1, then="prepare", then_duration=0.2),
                 on_end=qte_play("enemy", "idle", wait=False),
                 layout="random",
                 skin="small_d",

@@ -9,20 +9,20 @@ init -20 python:
             "steps": list(steps),
         }
     
-    def qte_show(actor, pose, x=None, y=None, zorder=None, follow_mirror=None, scale=None):
+    def qte_show(actor, pose, x=None, y=None, zorder=None, follow_mirror=None, scale=None, sfx=None):
         step = {
             "op": "show",
             "actor": actor,
             "pose": pose,
         }
 
-        for key, value in (("x", x), ("y", y), ("zorder", zorder), ("follow_mirror", follow_mirror), ("scale", scale)):
+        for key, value in (("x", x), ("y", y), ("zorder", zorder), ("follow_mirror", follow_mirror), ("scale", scale), ("sfx", sfx)):
             if value is not None:
                 step[key] = value
 
         return step
     
-    def qte_play(actor, pose, wait=True, then=None, duration=None, x=None, y=None, zorder=None, follow_mirror=None, scale=None, then_duration=None):
+    def qte_play(actor, pose, wait=True, then=None, duration=None, x=None, y=None, zorder=None, follow_mirror=None, scale=None, then_duration=None, sfx=None):
         step = {
             "op": "play",
             "actor": actor,
@@ -31,7 +31,8 @@ init -20 python:
             "then": then,
         }
 
-        for key, value in (("duration", duration), ("x", x), ("y", y), ("zorder", zorder), ("follow_mirror", follow_mirror), ("scale", scale), ("then_duration", then_duration)):
+        for key, value in (("duration", duration), ("x", x), ("y", y), ("zorder", zorder), ("follow_mirror", follow_mirror), ("scale", scale), 
+        ("then_duration", then_duration), ("sfx", sfx)):
             if value is not None:
                 step[key] = value
 
@@ -50,6 +51,16 @@ init -20 python:
             step["what"] = what
 
         return step
+
+    def qte_sfx(source, channel="sound", volume=1.0, fadein=0.0, fadeout=0.0):
+        return {
+            "op": "sfx",
+            "source": source,
+            "channel": channel,
+            "volume": volume,
+            "fadein": fadein,
+            "fadeout": fadeout,
+        }
     
     def qte_end(outcome):
         return {"op": "end", "outcome": outcome}
@@ -163,18 +174,12 @@ init -20 python:
         if isinstance(value, builtins.dict):
             value = [value]
 
-        qte_require(
-            isinstance(value, (builtins.list, tuple)),
-            hook_name + " must be a show/play instruction, a list, or None, received: %r" % repr(value),
-        )
+        qte_require(isinstance(value, (builtins.list, tuple)), hook_name + " must be a show/play/sfx instruction, a list, or None, received: %r" % (value,))
 
         steps = []
 
         for entry in value:
-            qte_require(
-                isinstance(entry, builtins.dict) and entry.get("op") in ("show", "play"),
-                hook_name + " only accepts show and play, not %r" % repr(entry),
-            )
+            qte_require(isinstance(entry, builtins.dict) and entry.get("op") in ("show", "play", "sfx"), hook_name + " only accepts show, play and sfx, not %r" % (entry,))
 
             step = dict(entry)
 
@@ -200,12 +205,17 @@ init -20 python:
         schemas = {
             "show": (
                 {"op", "actor", "pose"},
-                {"x", "y", "zorder", "follow_mirror", "scale"},
+                {"x", "y", "zorder", "follow_mirror", "scale", "sfx"},
             ),
 
             "play": (
                 {"op", "actor", "pose"},
-                {"wait", "then", "duration", "then_duration", "x", "y", "zorder", "follow_mirror", "scale"},
+                {"wait", "then", "duration", "then_duration", "x", "y", "zorder", "follow_mirror", "scale", "sfx"},
+            ),
+
+            "sfx": (
+                {"op", "source"},
+                {"channel", "volume", "fadein", "fadeout"},
             ),
 
             "wait": (
@@ -243,7 +253,7 @@ init -20 python:
         }
 
         for step in steps:
-            qte_require(isinstance(step, builtins.dict), "Every step must be an object, got: %r" % repr(step))
+            qte_require(isinstance(step, builtins.dict), "Every step must be an object, got: %r" % (step,))
 
             op = step.get("op")
 
@@ -251,7 +261,7 @@ init -20 python:
 
             required, optional = schemas[op]
 
-            qte_require(required <= set(step) <= required | optional, "Missing or unknown fields in " + repr(step.get("id")) + "\n Available fields: %r" % repr(schemas[op]))
+            qte_require(required <= set(step) <= required | optional, "Missing or unknown fields in " + repr(step.get("id")) + "\n Available fields: %r" % (schemas[op],))
 
             for key in ("x", "y"):
                 if key in step:
@@ -259,42 +269,48 @@ init -20 python:
                     
                     qte_require(qte_number(value) and 0 <= value <= 1, key + " must be a relative coordinate from 0 to 1")
             
-            if op in ("show", "play"):
-                qte_require(isinstance(step["actor"], str) and isinstance(step["pose"], str), "Actor and pose must be strings")
+            match op:
+            
+                case "show" | "play":
+                    qte_require(isinstance(step["actor"], str) and isinstance(step["pose"], str), "Actor and pose must be strings")
                 
-                session.stage.validate(step)
+                    session.stage.validate(step)
+                    session.audio.validate(step.get("sfx"))
             
-            elif op == "wait":
-                qte_require(qte_number(step["duration"]) and step["duration"] > 0, "Wait duration must be a positive number")
+                case "sfx":
+                    session.audio.validate(step)
             
-            elif op == "say":
-                for key in ("who", "what"):
-                    if key in step:
-                        value = step[key]
-                        qte_require(isinstance(value, str) and bool(value.strip()), f"Expected non-empty text for '{key}'")
-
-            elif op == "end":
-                value = step["outcome"]
-                qte_require(isinstance(value, str) and bool(value.strip()), "Outcome shouldn't be an empty value")
+                case "wait":
+                    qte_require(qte_number(step["duration"]) and step["duration"] > 0, "Wait duration must be a positive number")
             
-            elif op == "branch":
-                qte_validate_steps(step["success"], session)
-                qte_validate_steps(step["failure"], session)
+                case "say":
+                    for key in ("who", "what"):
+                        if key in step:
+                            value = step[key]
+                            qte_require(isinstance(value, str) and bool(value.strip()), f"Expected non-empty text for '{key}'")
+
+                case "end":
+                    value = step["outcome"]
+                    qte_require(isinstance(value, str) and bool(value.strip()), "Outcome shouldn't be an empty value")
             
-            elif op == "qte":
-                qte_validate_control(step, session)
-                qte_validate_pattern(step, session)
+                case "branch":
+                    qte_validate_steps(step["success"], session)
+                    qte_validate_steps(step["failure"], session)
+            
+                case "qte":
+                    qte_validate_control(step, session)
+                    qte_validate_pattern(step, session)
 
-                for key in ("who", "what"):
-                    value = step.get(key)
+                    for key in ("who", "what"):
+                        value = step.get(key)
 
-                    qte_require(value is None or isinstance(value, str), f"'{key}' must be a string or None")
+                        qte_require(value is None or isinstance(value, str), f"'{key}' must be a string or None")
 
-                for hook in ("on_start", "on_success", "on_failure", "on_end"):
-                    qte_validate_steps(step.get(hook, []), session)
+                    for hook in ("on_start", "on_success", "on_failure", "on_end"):
+                        qte_validate_steps(step.get(hook, []), session)
     
     def qte_validate_control(control, session):
-        qte_require(isinstance(control["id"], str) and bool(control["id"].strip()), "Invalid control ID, got: %r" % repr(control["id"]))
+        qte_require(isinstance(control["id"], str) and bool(control["id"].strip()), "Invalid control ID, got: %r" % (control["id"],))
 
         kind = control["kind"]
 
@@ -302,7 +318,7 @@ init -20 python:
 
         params = control.get("params", {})
 
-        qte_require(isinstance(params, builtins.dict), "params must be an object, not %r" % repr(type(params)))
+        qte_require(isinstance(params, builtins.dict), "params must be an object, not %r" % type(params))
 
         QTE_INPUT_TYPES[kind].validate(params)
 
@@ -325,7 +341,7 @@ init -20 python:
 
         for key in ("source", "target"):
             if control.get(key) is not None:
-                qte_require(isinstance(control[key], str), "Actor ID must be a string, got: %r" % repr(type(control[key])))
+                qte_require(isinstance(control[key], str), "Actor ID must be a string, got: %r" % type(control[key]))
 
                 session.actor(control[key])
         
