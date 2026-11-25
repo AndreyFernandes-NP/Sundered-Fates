@@ -6,7 +6,21 @@ init python:
     def qte_ui_signature(session):
         interaction = session.qte.current
 
-        return (session.state, interaction, None if interaction is None else interaction.view_revision, session.stage.revision)
+        return (session.state, interaction, None if interaction is None else interaction.view_revision, session.stage.revision, session.effects.revision)
+
+    def qte_ui_actor_mirrored(interaction, actor_id, follow_mirror):
+        if interaction is None or not interaction.mirrored or not follow_mirror:
+            return False
+
+        actors = interaction.definition.get("mirror")
+
+        if actors is None or not actors:
+            return True
+
+        if isinstance(actors, str):
+            return actor_id == actors
+
+        return actor_id in actors
 
     def qte_ui_clock_reset(session):
         session._qte_tick_at = None
@@ -84,10 +98,9 @@ screen qte_scene_view(session):
     timer 0.01 repeat True action Function(qte_ui_tick, session, _update_screens=False)
 
     $ current = session.qte.current
-    $ mirrored = current is not None and current.definition.get("mirrored", False)
 
     for actor_id, slot index (actor_id, slot["serial"]) in session.stage.draw_order():
-        $ actor_mirrored = mirrored and slot["follow_mirror"]
+        $ actor_mirrored = qte_ui_actor_mirrored(current, actor_id, slot["follow_mirror"])
 
         add slot["playback"].view:
             pos (slot["x"], slot["y"])

@@ -11,6 +11,9 @@ init -5 python:
     class QTEAudio:
         """Validates and plays immediate sound effects during any action inside a QTE"""
 
+        def __init__(self, qte_manager):
+            self.qte_manager = qte_manager
+
         def resolve_source(self, source):
             qte_require(isinstance(source, str) and bool(source.strip()), "Invalid SFX source: %r" % (source,))
 
@@ -42,7 +45,7 @@ init -5 python:
                         matches.append(path)
 
             if len(matches) > 1:
-                raise ValueError("[QTE AUDIO] Ambiguous SFX source %r; matches: %r" % (source, matches))
+                raise ValueError("[QTE AUDIO] Ambiguous SFX source %r, matches: %r" % (source, matches))
 
             if matches:
                 return matches[0]
@@ -84,7 +87,9 @@ init -5 python:
                 cue = qte_sfx(entry["source"])
                 cue.update(entry)
 
-                sources = cue["source"]
+                source_choice = qte_choice_info(cue["source"])
+                sources = (source_choice["options"] if source_choice is not None else cue["source"])
+
                 if isinstance(sources, str):
                     sources = [sources]
 
@@ -130,7 +135,11 @@ init -5 python:
                         "fadeout": fadeout,
                     })
 
-                selected = (renpy.random.randrange(len(candidates)) if choose and len(candidates) > 1 else 0)
+                if source_choice is not None:
+                    selected = qte_choice_index(source_choice, self.qte_manager.choice_history, choose)
+                else:
+                    selected = (renpy.random.randrange(len(candidates)) if choose and len(candidates) > 1 else 0)
+
                 cues.append(candidates[selected])
 
             return cues

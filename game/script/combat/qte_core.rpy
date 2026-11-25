@@ -6,21 +6,38 @@ init -10 python:
             self.current = None
             self.events = []
             self.announced = False
+            self.event_data = {}
+            self.button_history = []
+            self.choice_history = {}
+            self.completed_result = None
         
         def prepare(self, definition):
             """Requester of all the events in the start hook, the main interaction only runs after it ends"""
 
             if self.current is not None:
                 raise RuntimeError("[QTE CORE] Finish the current instance before preping another one")
-            
+
+            self.event_data = {}
+            self.button_history = []
+            self.choice_history = {}
+            self.completed_result = None
             self.emit("start", definition)
 
         def start(self, definition):
             if self.current is not None:
                 raise RuntimeError("[QTE CORE] Finish the previous instance before calling it again: %r" % (self.current,))
             
-            self.current = QTEPatternRun(definition)
+            self.current = QTEPatternRun(definition, self.event_data, self.button_history, self.choice_history)
             self.announced = False
+
+        def set_event_data(self, key, value):
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError("[QTE CORE] Event data keys must be non-empty strings")
+
+            self.event_data[key] = value
+
+            if self.completed_result is not None:
+                self.completed_result["data"] = dict(self.event_data)
         
         def emit(self, name, definition, result=None):
             self.events.append({
@@ -60,7 +77,9 @@ init -10 python:
                 raise RuntimeError("[QTE CORE] Previous instance has not been finished, end before calling collect")
             
             result = dict(self.current.result)
+            result["data"] = dict(self.event_data)
             self.current = None
+            self.completed_result = result
 
             return result
     

@@ -19,10 +19,44 @@ init -5 python:
 
         return int(value.to_integral_value(rounding=ROUND_CEILING))
 
-    def qte_build_controls(step, randomize=False):
+    def qte_choose_boolean(value, option_name, randomize=False, choice_history=None):
+        choice = qte_choice_info(value)
+
+        if choice is not None:
+            options = choice["options"]
+
+            qte_require(all(type(option) is bool for option in options), option_name + " qte_choice options must all be booleans")
+
+            index = qte_choice_index(choice, choice_history if choice_history is not None else {}, randomize)
+            
+            return options[index]
+
+        if isinstance(value, (builtins.list, tuple)):
+            qte_require(bool(value) and all(type(option) is bool for option in value), option_name + " must be a boolean or a non-empty list of booleans")
+
+            return value[renpy.random.randrange(len(value))] if randomize else value[0]
+
+        qte_require(type(value) is bool, option_name + " must be a boolean or a non-empty list of booleans")
+        return value
+
+    def qte_build_controls(step, randomize=False, choice_history=None):
         count = qte_pattern_count(step)
         points = qte_layout_points(step, count, randomize)
         overrides = step.get("buttons", [])
+        pattern_name = step.get("pattern", "single")
+        mirrored_option = step.get("mirrored", False)
+        mirror_xpos_option = step.get("mirror_xpos")
+
+        if (
+            isinstance(mirrored_option, (builtins.list, tuple))
+            or qte_choice_info(mirrored_option) is not None
+            or isinstance(mirror_xpos_option, (builtins.list, tuple))
+            or qte_choice_info(mirror_xpos_option) is not None
+        ):
+            qte_require(pattern_name in ("single", "chain", "timed"), "mirrored and mirror_xpos option lists or qte_choice are only supported by single, chain and timed patterns")
+
+        if mirror_xpos_option is not None:
+            qte_choose_boolean(mirror_xpos_option, "mirror_xpos", choice_history=choice_history)
 
         allowed = {
             "id", "kind", "source", "target",
@@ -35,6 +69,9 @@ init -5 python:
         for index in range(count):
             extra = (overrides[index] if index < len(overrides) else {})
             qte_require(isinstance(extra, builtins.dict) and set(extra) <= allowed, "Invalid fields in button dict; only on_press and on_miss hooks are supported there")
+            mirrored = qte_choose_boolean(mirrored_option, "mirrored", randomize, choice_history)
+
+            mirror_xpos = (mirrored if mirror_xpos_option is None else qte_choose_boolean(mirror_xpos_option, "mirror_xpos", randomize, choice_history))
 
             kind = extra.get("kind", step["kind"])
             params = (step.get("params", {}) if kind == step["kind"] else {})
@@ -56,8 +93,8 @@ init -5 python:
                 "skin": step.get("skin", "default"),
                 "x": points[index][0],
                 "y": points[index][1],
-                "mirrored": step.get("mirrored", False),
-                "mirror_xpos": step.get("mirror_xpos", step.get("mirrored", False)),
+                "mirrored": mirrored,
+                "mirror_xpos": mirror_xpos,
             }
 
             control.update(extra)
@@ -166,9 +203,12 @@ init -5 python:
 
         screen_name = "qte_pattern_control"
 
-        def __init__(self, definition):
+        def __init__(self, definition, event_data=None, button_history=None, choice_history=None):
             self.definition = definition
             self.pattern_name = definition.get("pattern", "single")
+            self.event_data = ({} if event_data is None else event_data)
+            self.button_history = ([] if button_history is None else button_history)
+            self.choice_history = ({} if choice_history is None else choice_history)
 
             self.elapsed = 0.0
             self.result = None
@@ -181,7 +221,7 @@ init -5 python:
             self._input = None
             self.events = []
 
-            definitions = qte_build_controls(definition, randomize=True)
+            definitions = qte_build_controls(definition, randomize=True, choice_history=self.choice_history)
 
             for uid, data in enumerate(definitions):
                 control = QTE_INPUT_TYPES[data["kind"]](data)
@@ -204,6 +244,10 @@ init -5 python:
         def view_revision(self):
             return (self._view_revision, tuple((control.uid, control.view_revision) for control in self.active))
 
+        @property
+        def mirrored(self):
+            return (False if not self.active else self.active[-1].definition["mirrored"])
+
         def spawn_next(self):
             if not self.has_pending:
                 return None
@@ -212,6 +256,21 @@ init -5 python:
             self.next_index += 1
 
             self.active.append(control)
+            self.button_history.append({
+                "uid": control.uid,
+                "id": control.definition["id"],
+                "order": len(self.button_history) + 1,
+                "x": control.definition["x"],
+                "y": control.definition["y"],
+                "mirrored": control.definition["mirrored"],
+                "mirror_xpos": control.definition["mirror_xpos"],
+                "appeared_at": self.elapsed,
+                "success": None,
+                "grade": None,
+                "reason": None,
+                "elapsed": None,
+                "result": None,
+            })
             self._view_revision += 1
 
             return control
@@ -263,6 +322,10 @@ init -5 python:
                     control.update(dt)
 
                 if control.result is not None:
+                    history_entry = self.button_history[control.uid]
+                    history_entry.update(control.result)
+                    history_entry["result"] = dict(control.result)
+
                     if not control.result["success"] and control.definition.get("on_miss"):
                         self.events.append({
                             "name": "miss",
@@ -315,6 +378,8 @@ init -5 python:
                     dict(result)
                     for result in self.results
                 ],
+                "button_history": [dict(entry) for entry in self.button_history],
+                "data": dict(self.event_data),
             }
 
         def hint_link(self):

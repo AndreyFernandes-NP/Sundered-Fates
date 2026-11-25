@@ -35,7 +35,8 @@ init -10 python:
 
             self.qte = QTEManager()
             self.stage = QTEStage(self)
-            self.audio = QTEAudio()
+            self.audio = QTEAudio(self.qte)
+            self.effects = QTEEffects(self.qte)
 
             self.run = None
             self.qte_results = []
@@ -257,17 +258,28 @@ init -10 python:
         
         def apply_feedback(self, step):
             self._require_state("active")
+            step = qte_resolve_event_refs(step, self)
             op = step["op"]
 
             if op == "sfx":
                 self.audio.play(step)
                 return None
+            
+            if op == "effect":
+                self.effects.play(step)
+                return None
+
+            if op == "data_set":
+                self.qte.set_event_data(step["key"], copy.deepcopy(step["value"]))
+                return None
 
             if op in ("show", "play"):
                 cues = self.audio.resolve(step.get("sfx"))
+                self.effects.validate(step.get("effect"))
 
                 playback = self.stage.apply(step)
                 self.audio.play(cues)
+                self.effects.play(step.get("effect"))
 
                 return playback
 

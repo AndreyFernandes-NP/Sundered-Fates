@@ -6,7 +6,7 @@ init -10 python:
             "x": 0.5,
             "y": 0.5,
             "zorder": 100,
-            "follow_mirror": False,
+            "follow_mirror": True,
         }
     }
 
