@@ -6,7 +6,7 @@ init python:
     def qte_ui_signature(session):
         interaction = session.qte.current
 
-        return (session.state, interaction, None if interaction is None else interaction.view_revision, session.stage.revision, session.effects.revision)
+        return (session.state, interaction, None if interaction is None else interaction.view_revision, session.stage.revision, session.effects.revision, session.images.revision)
 
     def qte_ui_actor_mirrored(interaction, actor_id, follow_mirror):
         if interaction is None or not interaction.mirrored or not follow_mirror:
@@ -99,6 +99,9 @@ screen qte_scene_view(session):
 
     $ current = session.qte.current
 
+    for free_image index free_image.serial in session.images.draw_order(False):
+        add free_image.view
+
     for actor_id, slot index (actor_id, slot["serial"]) in session.stage.draw_order():
         $ actor_mirrored = qte_ui_actor_mirrored(current, actor_id, slot["follow_mirror"])
 
@@ -107,6 +110,9 @@ screen qte_scene_view(session):
             anchor (0.5, 0.5)
 
             at Transform(xzoom=-1 if actor_mirrored else 1)
+    
+    for free_image index free_image.serial in session.images.draw_order(True):
+        add free_image.view
 
 screen qte_wait_screen(session):
     modal True

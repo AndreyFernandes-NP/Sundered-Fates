@@ -18,7 +18,7 @@ label qte_execute(session, script, step=None, result=None, prepared=None, playba
         if step["op"] not in ("qte", "_activate_qte"):
             $ step = qte_resolve_event_refs(step, session)
 
-        if step["op"] in ("show", "play", "sfx", "effect", "data_set"):
+        if step["op"] in ("show", "play", "sfx", "effect", "image", "data_set"):
             $ playback = session.apply_feedback(step)
 
             if step["op"] == "play" and step.get("wait", True):

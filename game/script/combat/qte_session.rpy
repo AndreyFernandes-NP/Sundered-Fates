@@ -37,6 +37,7 @@ init -10 python:
             self.stage = QTEStage(self)
             self.audio = QTEAudio(self.qte)
             self.effects = QTEEffects(self.qte)
+            self.images = QTEImages(self.qte)
 
             self.run = None
             self.qte_results = []
@@ -185,6 +186,7 @@ init -10 python:
             qte_require(qte_number(dt) and dt >= 0, "Invalid scene delta time")
 
             self.stage.update(dt)
+            self.images.update(dt)
 
             if isinstance(self.waiting, QTEDelay):
                 self.waiting.update(dt)
@@ -261,6 +263,10 @@ init -10 python:
             step = qte_resolve_event_refs(step, self)
             op = step["op"]
 
+            if op == "image":
+                self.images.apply(step)
+                return None
+
             if op == "sfx":
                 self.audio.play(step)
                 return None
@@ -306,6 +312,7 @@ init -10 python:
                 }
             
             self.state = "finished"
+            self.images.clear()
 
             return {
                 "scene": self.scene_id,

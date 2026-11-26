@@ -351,8 +351,8 @@ init -20 python:
         steps = []
 
         for entry in value:
-            qte_require(isinstance(entry, builtins.dict) and entry.get("op") in ("show", "play", "sfx", "effect", "data_set"),
-                        hook_name + " only accepts show, play, sfx, effect and event data updates, not %r" % (entry,))
+            qte_require(isinstance(entry, builtins.dict) and entry.get("op") in ("show", "play", "sfx", "effect", "image", "data_set"),
+                        hook_name + " only accepts show, play, sfx, effect, image and event data updates, not %r" % (entry,))
 
             step = dict(entry)
 
@@ -394,6 +394,11 @@ init -20 python:
             "effect": (
                 {"op", "name"},
                 {"layers", "always"},
+            ),
+
+            "image": (
+                {"op", "name"},
+                {"at", "atl", "trans", "xpos", "ypos", "zorder", "action"},
             ),
 
             "data_set": (
@@ -454,7 +459,7 @@ init -20 python:
                     qte_require(qte_number(value) and 0 <= value <= 1, key + " must be a relative coordinate from 0 to 1")
             
             match op:
-            
+
                 case "show" | "play":
                     qte_require(isinstance(step["actor"], str) and isinstance(step["pose"], str), "Actor and pose must be strings")
                 
@@ -467,6 +472,9 @@ init -20 python:
                 
                 case "effect":
                     session.effects.validate(step)
+                
+                case "image":
+                    session.images.validate(step)
 
                 case "data_set":
                     qte_require(isinstance(step["key"], str) and bool(step["key"].strip()), "Event data key must be a non-empty string")
@@ -566,3 +574,5 @@ init -20 python:
         
         qte_validate_steps(qte_press_steps(control.get("on_press")), session)
         qte_validate_steps(qte_miss_steps(control.get("on_miss")), session)
+
+# Dante. Wny are you coding and not grinding mirror dungeons, Danteh?

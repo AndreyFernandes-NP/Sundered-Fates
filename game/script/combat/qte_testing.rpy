@@ -78,7 +78,7 @@ init 1 python:
                 duration=1.0,
                 threshold=0.8,
                 on_start=(qte_play("enemy", "prepare")),
-                on_press=(qte_play("enemy", "attack", duration=0.2, then="prepare", then_duration=0.3, sfx=qte_sfx(qte_choice(sfx_test, mode="avoid_last", last=2), volume=[0.3, 0.4, 0.3]), effect=qte_effect(vfx_test)), qte_play("player", "parry", duration=0.2, then="idle")),
+                on_press=(qte_play("enemy", "attack", duration=0.2, then="prepare", then_duration=0.3, sfx=qte_sfx(qte_choice(sfx_test, mode="avoid_last", last=1), volume=[0.3, 0.4, 0.3]), effect=qte_effect(vfx_test)), qte_play("player", "parry", duration=0.2, then="idle")),
                 on_miss=qte_play("enemy", "attack", duration=0.1, then="prepare", then_duration=0.2),
                 on_end=qte_play("enemy", "attack", then="idle", wait=True),
                 layout="random",
