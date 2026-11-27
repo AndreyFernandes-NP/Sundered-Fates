@@ -75,6 +75,11 @@ init -10 python:
     
     def qte_resolve_clip(value, duration=None):
         """Creates a clip based on a filename, sequence of frames or any images in Ren'py"""
+
+        media = qte_resolve_media(value, duration)
+
+        if media is not None:
+            return media
         
         if isinstance(value, str):
             value = {"source": value}

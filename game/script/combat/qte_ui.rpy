@@ -6,7 +6,11 @@ init python:
     def qte_ui_signature(session):
         interaction = session.qte.current
 
-        return (session.state, interaction, None if interaction is None else interaction.view_revision, session.stage.revision, session.effects.revision, session.images.revision)
+        return (
+            session.state, interaction, None if interaction is None else interaction.view_revision,
+            session.stage.revision, session.effects.revision, session.images.revision,
+            0 if session.videos is None else session.videos.revision,
+        )
 
     def qte_ui_actor_mirrored(interaction, actor_id, follow_mirror):
         if interaction is None or not interaction.mirrored or not follow_mirror:
@@ -40,13 +44,18 @@ init python:
             renpy.restart_interaction()
 
     def qte_ui_tick(session, input_name=None):
+        if session.media is not None:
+            session.media.sync_pause()
+
         if(renpy.context_nesting_level() != getattr(session, "_qte_context_depth", 0)):
+            session.qte.set_visual_active(False)
             session._qte_tick_at = None
             return None
 
         result = None
 
         if session.state == "active":
+            session.qte.set_visual_active(True)
             now = time.monotonic()
 
             dt = (0.0 if session._qte_tick_at is None else max(0.0, now - session._qte_tick_at))
@@ -55,6 +64,7 @@ init python:
             result = session.update(dt, input_name)
 
         else:
+            session.qte.set_visual_active(False)
             session._qte_tick_at = None
 
         if result is None:
@@ -87,6 +97,7 @@ init python:
     def qte_ui_after_load():
         if qte_active_session is not None:
             qte_ui_clock_reset(qte_active_session)
+            qte_active_session.qte.set_visual_active(False)
 
     config.after_load_callbacks.append(qte_ui_after_load)
 
@@ -99,8 +110,8 @@ screen qte_scene_view(session):
 
     $ current = session.qte.current
 
-    for free_image index free_image.serial in session.images.draw_order(False):
-        add free_image.view
+    for item index (type(item).__name__, item.name, item.serial) in qte_scene_objects(session, False):
+        add item.view
 
     for actor_id, slot index (actor_id, slot["serial"]) in session.stage.draw_order():
         $ actor_mirrored = qte_ui_actor_mirrored(current, actor_id, slot["follow_mirror"])
@@ -111,8 +122,8 @@ screen qte_scene_view(session):
 
             at Transform(xzoom=-1 if actor_mirrored else 1)
     
-    for free_image index free_image.serial in session.images.draw_order(True):
-        add free_image.view
+    for item index (type(item).__name__, item.name, item.serial) in qte_scene_objects(session, True):
+        add item.view
 
 screen qte_wait_screen(session):
     modal True

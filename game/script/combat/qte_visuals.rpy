@@ -80,7 +80,7 @@ init -5 python:
                 self.approach_duration = (duration * (self.approach_start - self.approach_end) / (self.approach_start - 0.01))
 
         def animate_button(self, trans, st, at):
-            elapsed = max(0.0, self.interaction.elapsed)
+            elapsed = max(0.0, self.interaction.visual_elapsed)
 
             trans.zoom = self.scale
             trans.alpha = min(1.0, elapsed / self.button_fade)
@@ -88,7 +88,7 @@ init -5 python:
             return 0.0 if elapsed < self.button_fade else None
 
         def animate_approach(self, trans, st, at):
-            elapsed = max(0.0, self.interaction.elapsed)
+            elapsed = max(0.0, self.interaction.visual_elapsed)
             duration = self.approach_duration
 
             if duration is None:

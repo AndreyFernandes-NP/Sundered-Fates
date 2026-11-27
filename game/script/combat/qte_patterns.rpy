@@ -220,6 +220,7 @@ init -5 python:
             self._view_revision = 0
             self._input = None
             self.events = []
+            self.visual_active = False
 
             definitions = qte_build_controls(definition, randomize=True, choice_history=self.choice_history)
 
@@ -254,6 +255,7 @@ init -5 python:
 
             control = self.controls[self.next_index]
             self.next_index += 1
+            control.set_visual_active(self.visual_active)
 
             self.active.append(control)
             self.button_history.append({
@@ -274,6 +276,15 @@ init -5 python:
             self._view_revision += 1
 
             return control
+
+        def set_visual_active(self, active):
+            if self.visual_active == active:
+                return
+
+            self.visual_active = active
+
+            for control in self.active:
+                control.set_visual_active(active)
 
         def drain_events(self):
             events = self.events

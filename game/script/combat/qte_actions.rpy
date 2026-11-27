@@ -1,4 +1,6 @@
 init -15 python:
+    import time
+
     class QTEInteraction:
         """
         Works like a mutable state for any type of execution,
@@ -18,10 +20,29 @@ init -15 python:
             self.result = None
             self.uid = None
             self.view_revision = 0
+            self.visual_active = False
+            self.visual_tick_at = None
+
+        @property
+        def visual_elapsed(self):
+            if not self.visual_active or self.visual_tick_at is None or self.result is not None:
+                return self.elapsed
+
+            elapsed = self.elapsed + max(0.0, time.monotonic() - self.visual_tick_at)
+
+            return min(self.duration, elapsed)
+
+        def set_visual_active(self, active):
+            if self.visual_active == active:
+                return
+
+            self.visual_active = active
+            self.visual_tick_at = time.monotonic() if active else None
 
         def update(self, dt):
             if self.result is None:
                 self.elapsed = min(self.duration, self.elapsed + dt)
+                self.visual_tick_at = time.monotonic() if self.visual_active else None
 
                 if self.elapsed >= self.duration:
                     self.finish(False, "timeout")

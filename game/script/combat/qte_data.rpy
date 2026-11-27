@@ -349,10 +349,11 @@ init -20 python:
         qte_require(isinstance(value, (builtins.list, tuple)), hook_name + " must be a show/play/sfx/effect instruction, a list, or None, received: %r" % (value,))
 
         steps = []
+        allowed = {"show", "play", "sfx", "effect", "image", "video", "data_set"}
 
         for entry in value:
-            qte_require(isinstance(entry, builtins.dict) and entry.get("op") in ("show", "play", "sfx", "effect", "image", "data_set"),
-                        hook_name + " only accepts show, play, sfx, effect, image and event data updates, not %r" % (entry,))
+            op = entry.get("op") if isinstance(entry, builtins.dict) else None
+            qte_require(isinstance(op, str) and op in allowed, hook_name + " only accepts show, play, sfx, effect, image, video and data_set instructions, not %r" % (entry,))
 
             step = dict(entry)
 
@@ -399,6 +400,11 @@ init -20 python:
             "image": (
                 {"op", "name"},
                 {"at", "atl", "trans", "xpos", "ypos", "zorder", "action"},
+            ),
+
+            "video": (
+                {"op", "name"},
+                QTE_VIDEO_OPTIONS - {"op", "name"},
             ),
 
             "data_set": (
@@ -475,6 +481,9 @@ init -20 python:
                 
                 case "image":
                     session.images.validate(step)
+
+                case "video":
+                    session.ensure_videos().validate(step)
 
                 case "data_set":
                     qte_require(isinstance(step["key"], str) and bool(step["key"].strip()), "Event data key must be a non-empty string")

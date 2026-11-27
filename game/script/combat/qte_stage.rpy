@@ -82,6 +82,8 @@ init -10 python:
             self.display_for(step, self.slots.get(step["actor"]))
             clip = self.clip_for(step["actor"], step["pose"], step.get("duration"), step.get("scale"))
 
+            qte_require(step["op"] != "show" or clip["kind"] != "media", "Use qte_play for videos, qte_show does not start media")
+
             if step["op"] == "play":
                 qte_require(type(step.get("wait", True)) is bool, "play.wait must be boolean")
 
@@ -97,7 +99,7 @@ init -10 python:
                     self.clip_for(step["actor"], after, then_duration)
 
                 if step.get("wait", True) or after is not None:
-                    qte_require(clip["duration"] is not None and not clip["loop"], "You can't use Wait during a loop, the clip must have a set duration")
+                    qte_require(qte_can_wait_clip(clip), "Playback with 'wait' or 'then' requires a non-looping clip that can finish")
 
             return clip
 
@@ -118,10 +120,10 @@ init -10 python:
 
                 return old["playback"]
 
-            playback = QTEPlayback(clip)
+            if old is not None:
+                qte_close_playback(old["playback"])
 
-            if old is not None and not old["playback"].done:
-                old["playback"].cancelled = True
+            playback = qte_make_playback(clip, self.session)
 
             self.serial += 1
 

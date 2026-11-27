@@ -30,6 +30,10 @@ init -10 python:
             self.current = QTEPatternRun(definition, self.event_data, self.button_history, self.choice_history)
             self.announced = False
 
+        def set_visual_active(self, active):
+            if self.current is not None:
+                self.current.set_visual_active(active)
+
         def set_event_data(self, key, value):
             if not isinstance(key, str) or not key.strip():
                 raise ValueError("[QTE CORE] Event data keys must be non-empty strings")

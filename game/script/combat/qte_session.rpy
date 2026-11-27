@@ -35,6 +35,8 @@ init -10 python:
 
             self.qte = QTEManager()
             self.stage = QTEStage(self)
+            self.media = None
+            self.videos = None
             self.audio = QTEAudio(self.qte)
             self.effects = QTEEffects(self.qte)
             self.images = QTEImages(self.qte)
@@ -71,6 +73,19 @@ init -10 python:
                     },
                 )
 
+        def ensure_media(self):
+            if self.media is None:
+                self.media = QTEMedia(self)
+                qte_media_bind(self)
+
+            return self.media
+
+        def ensure_videos(self):
+            if self.videos is None:
+                self.videos = QTEVideos(self)
+
+            return self.videos
+
         def actor(self, actor_id):
             """Returns any actor in a scene by their ID"""
 
@@ -93,11 +108,17 @@ init -10 python:
             self._require_state("active")
             self._qte_tick_at = None
             self.state = "paused"
+            self.qte.set_visual_active(False)
+            if self.media is not None:
+                self.media.sync_pause()
         
         def resume(self):
             self._require_state("paused")
             self._qte_tick_at = None
             self.state = "active"
+            self.qte.set_visual_active(True)
+            if self.media is not None:
+                self.media.sync_pause()
 
         def adjust_stat(self, actor_id, stat, amount, operation="set"):
             """Changes any actor stat during a scene and for that scene ONLY"""
@@ -160,7 +181,7 @@ init -10 python:
                 raise RuntimeError("[QTE SESSION] Invalid type of Wait")
             
             if isinstance(waiter, QTEPlayback):
-                qte_require(waiter.duration is not None and not waiter.clip["loop"], "Cannot wait while there's an animation being looped, stop that first")
+                qte_require(qte_can_wait_clip(waiter.clip), "Cannot wait on a looping clip or a clip without a completion condition")
             
             self.waiting = waiter
             self._qte_tick_at = None
@@ -187,6 +208,8 @@ init -10 python:
 
             self.stage.update(dt)
             self.images.update(dt)
+            if self.videos is not None:
+                self.videos.update(dt)
 
             if isinstance(self.waiting, QTEDelay):
                 self.waiting.update(dt)
@@ -263,31 +286,37 @@ init -10 python:
             step = qte_resolve_event_refs(step, self)
             op = step["op"]
 
-            if op == "image":
-                self.images.apply(step)
-                return None
+            match op:
 
-            if op == "sfx":
-                self.audio.play(step)
-                return None
+                case "image":
+                    self.images.apply(step)
+                    return None
+
+                case "video":
+                    self.ensure_videos().apply(step)
+                    return None
+
+                case "sfx":
+                    self.audio.play(step)
+                    return None
             
-            if op == "effect":
-                self.effects.play(step)
-                return None
+                case "effect":
+                    self.effects.play(step)
+                    return None
 
-            if op == "data_set":
-                self.qte.set_event_data(step["key"], copy.deepcopy(step["value"]))
-                return None
+                case "data_set":
+                    self.qte.set_event_data(step["key"], copy.deepcopy(step["value"]))
+                    return None
 
-            if op in ("show", "play"):
-                cues = self.audio.resolve(step.get("sfx"))
-                self.effects.validate(step.get("effect"))
+                case "show" | "play":
+                    cues = self.audio.resolve(step.get("sfx"))
+                    self.effects.validate(step.get("effect"))
 
-                playback = self.stage.apply(step)
-                self.audio.play(cues)
-                self.effects.play(step.get("effect"))
+                    playback = self.stage.apply(step)
+                    self.audio.play(cues)
+                    self.effects.play(step.get("effect"))
 
-                return playback
+                    return playback
 
             raise ValueError("[QTE SESSION] Unsupported feedback operation: " + repr(op))
         
@@ -313,6 +342,9 @@ init -10 python:
             
             self.state = "finished"
             self.images.clear()
+            if self.videos is not None:
+                self.videos.clear()
+            qte_media_unbind(self)
 
             return {
                 "scene": self.scene_id,
